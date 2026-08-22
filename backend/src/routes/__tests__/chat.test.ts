@@ -64,6 +64,58 @@ function makeChatsDb(existingByExternalRef: Record<string, { id: string }>) {
     return { db: db as any, inserted };
 }
 
+/**
+ * Simulates the race between two concurrent POST /create calls sharing an
+ * external_ref: the initial lookup finds nothing (both requests raced past
+ * it), the insert hits the unique partial index and comes back as a
+ * Postgres 23505 unique-violation, and only the re-lookup after that
+ * finds the row the other, faster request actually created.
+ */
+function makeRacingChatsDb(winningChatId: string) {
+    const inserted: Record<string, unknown>[] = [];
+    let selectCallCount = 0;
+
+    function chatsBuilder() {
+        const b: any = {
+            select: () => b,
+            eq: () => b,
+            maybeSingle: () => {
+                selectCallCount += 1;
+                // First select = the initial get-or-create lookup (misses).
+                // Second select = the post-conflict re-lookup (hits).
+                const data =
+                    selectCallCount >= 2 ? { id: winningChatId } : null;
+                return Promise.resolve({ data, error: null });
+            },
+            insert: (row: Record<string, unknown>) => {
+                inserted.push(row);
+                return {
+                    select: () => ({
+                        single: () =>
+                            Promise.resolve({
+                                data: null,
+                                error: {
+                                    code: "23505",
+                                    message:
+                                        'duplicate key value violates unique constraint "chats_user_external_ref_unique"',
+                                },
+                            }),
+                    }),
+                };
+            },
+        };
+        return b;
+    }
+
+    const db = {
+        from: (table: string) => {
+            if (table === "chats") return chatsBuilder();
+            throw new Error(`unexpected table in test: ${table}`);
+        },
+    };
+    return { db: db as any, inserted };
+}
+
 let currentDb: ReturnType<typeof makeChatsDb>["db"];
 
 vi.mock("../../lib/supabase", () => ({
@@ -128,6 +180,27 @@ describe("POST /chat/create", () => {
                 user_id: "user-1",
                 project_id: null,
                 external_ref: null,
+            },
+        ]);
+    });
+
+    it("returns the winning request's chat id on a concurrent-insert race, instead of a 500", async () => {
+        const { db, inserted } = makeRacingChatsDb("winner-chat-id");
+        currentDb = db;
+
+        const response = await request(app)
+            .post("/chat/create")
+            .send({ external_ref: "slack:C123:456.789" });
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({ id: "winner-chat-id" });
+        // The losing request still attempted exactly one insert before
+        // recovering via the re-lookup.
+        expect(inserted).toEqual([
+            {
+                user_id: "user-1",
+                project_id: null,
+                external_ref: "slack:C123:456.789",
             },
         ]);
     });

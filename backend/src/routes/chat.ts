@@ -165,7 +165,27 @@ chatRouter.post("/create", requireAuth, async (req, res) => {
         .select("id")
         .single();
 
-    if (error) return void res.status(500).json({ detail: error.message });
+    if (error) {
+        // A concurrent request can win the race between our lookup and this
+        // insert: both pass the SELECT above (finding nothing), then both
+        // attempt to insert. The unique partial index on
+        // (user_id, external_ref) stops the duplicate row, but the loser
+        // sees a 23505 unique-violation here instead of a chat id. Since we
+        // know the row now exists (that's the only way this insert can
+        // violate that particular index), re-run the lookup and hand back
+        // the winner's id instead of surfacing a spurious 500.
+        if (error.code === "23505" && externalRef) {
+            const { data: existing, error: relookupError } = await db
+                .from("chats")
+                .select("id")
+                .eq("user_id", userId)
+                .eq("external_ref", externalRef)
+                .maybeSingle();
+            if (!relookupError && existing)
+                return void res.json({ id: existing.id });
+        }
+        return void res.status(500).json({ detail: error.message });
+    }
     res.json({ id: data.id });
 });
 
