@@ -33,7 +33,10 @@ import {
   createCitation,
   CITATIONS_OPEN_TAG,
 } from "./citations";
-import { runToolCalls } from "./tools/toolDispatcher";
+import {
+  normalizeAskInputsEvent,
+  runToolCalls,
+} from "./tools/toolDispatcher";
 import {
   getCachedCaseOpinionTexts,
   type CourtlistenerTurnState,
@@ -157,6 +160,69 @@ function isAskInputsPause(error: unknown): boolean {
   return record.cause !== error && isAskInputsPause(record.cause);
 }
 
+const PLAIN_TEXT_QUESTION_RULE =
+  "- If you need the user to choose between options, answer an open question, clarify a missing premise, or attach documents before you can continue, ask for it in plain text in your reply and stop there. Do not guess at an answer that depends on it.";
+
+/**
+ * For a caller that cannot answer the ask_inputs picker the tool is not
+ * offered, so no instruction may name it either: a model told to call a tool
+ * it does not have calls it anyway (AI_NoSuchToolError).
+ */
+export function withoutAskInputsInstructions(systemPrompt: string): string {
+  const kept = systemPrompt
+    .split("\n")
+    .filter((line) => !line.includes("ask_inputs"));
+  if (kept.length === systemPrompt.split("\n").length) return systemPrompt;
+  const coreRules = kept.indexOf("CORE RULES:");
+  if (coreRules < 0) return [...kept, PLAIN_TEXT_QUESTION_RULE].join("\n");
+  let end = coreRules + 1;
+  while (end < kept.length && kept[end].startsWith("- ")) end += 1;
+  kept.splice(end, 0, PLAIN_TEXT_QUESTION_RULE);
+  return kept.join("\n");
+}
+
+/** An ask_inputs request rendered as a question the user can answer in text. */
+export function renderAskInputsAsText(event: AskInputsEvent): string {
+  const lines = event.items.map((item) => {
+    if (item.kind === "documents") {
+      const types = item.document_types.filter(Boolean);
+      return `- Please attach: ${types.length ? types.join(", ") : "the relevant documents"}`;
+    }
+    if (item.kind === "choice") {
+      const options = item.options.map((o) => o.value).filter(Boolean);
+      return options.length
+        ? `- ${item.question} (options: ${options.join(", ")})`
+        : `- ${item.question}`;
+    }
+    return `- ${item.question}`;
+  });
+  return ["I need more information before I can continue:", ...lines].join("\n");
+}
+
+function withheldAskInputsCall(error: unknown): AskInputsEvent | null {
+  if (!error || typeof error !== "object") return null;
+  const record = error as { name?: unknown; toolName?: unknown; input?: unknown };
+  if (
+    record.name !== "UnavailableToolCallError" ||
+    record.toolName !== "ask_inputs"
+  ) {
+    return null;
+  }
+  let input = record.input;
+  if (typeof input === "string") {
+    try {
+      input = JSON.parse(input);
+    } catch {
+      input = {};
+    }
+  }
+  const args =
+    input && typeof input === "object" && !Array.isArray(input)
+      ? (input as Record<string, unknown>)
+      : {};
+  return normalizeAskInputsEvent(args);
+}
+
 export function isAbortError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   const record = error as { name?: unknown; message?: unknown };
@@ -236,8 +302,11 @@ export async function runLLMStream(params: {
   // Extract system prompt; pass remaining turns to the adapter as
   // plain user/assistant messages.
   const rawMsgs = apiMessages as { role: string; content: string | null }[];
-  const systemPrompt =
+  const requestedSystemPrompt =
     rawMsgs[0]?.role === "system" ? (rawMsgs[0].content ?? "") : "";
+  const systemPrompt = includeAskInputs
+    ? requestedSystemPrompt
+    : withoutAskInputsInstructions(requestedSystemPrompt);
   const chatMessages: LlmMessage[] = rawMsgs
     .filter((m) => m.role !== "system")
     .map((m) => ({
@@ -578,10 +647,19 @@ export async function runLLMStream(params: {
       },
     });
   } catch (err) {
+    const withheldAsk = withheldAskInputsCall(err);
     if (isAskInputsPause(err)) {
       // The ask_inputs event has already been emitted and persisted in `events`.
       // Stop this assistant turn here so the model does not add redundant
       // prose telling the user to answer the picker or attach documents.
+    } else if (withheldAsk) {
+      // The caller cannot answer a picker, so the tool was withheld, yet the
+      // model asked through it anyway (e.g. prompted by earlier turns). Ask
+      // the same questions as text; the turn ends like any other answer.
+      const question = renderAskInputsAsText(withheldAsk);
+      const delta = iterText || fullText ? `\n\n${question}` : question;
+      iterText += delta;
+      streamVisibleContent(delta);
     } else if (isAbortError(err)) {
       flushPartialTurn({ emit: false });
       throw new AssistantStreamAbortError(fullText, events);

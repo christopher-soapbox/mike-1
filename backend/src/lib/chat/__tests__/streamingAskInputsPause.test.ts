@@ -18,6 +18,8 @@ vi.mock("../../mcpConnectors", () => ({
 }));
 
 import { runLLMStream } from "../streaming";
+import { SYSTEM_PROMPT } from "../prompts";
+import { UnavailableToolCallError } from "../../llm/types";
 
 const ASK_CALL = {
     id: "call-1",
@@ -55,7 +57,10 @@ async function run(opts: { includeAskInputs?: boolean } = {}) {
     const write = vi.fn();
     const db = emptyDb();
     const result = await runLLMStream({
-        apiMessages: [{ role: "user", content: "Review this NDA" }],
+        apiMessages: [
+            { role: "system", content: SYSTEM_PROMPT },
+            { role: "user", content: "Review this NDA" },
+        ],
         docStore: {},
         docIndex: {},
         userId: "user-1",
@@ -122,5 +127,63 @@ describe("runLLMStream ask_inputs pause", () => {
             }
         ).tools.map((t) => t.function.name);
         expect(tools).not.toContain("ask_inputs");
+    });
+
+    it("does not tell the model about ask_inputs when the caller opts out", async () => {
+        streamChatWithTools.mockResolvedValue({ fullText: "An answer." });
+
+        await run({ includeAskInputs: false });
+
+        const { systemPrompt } = streamChatWithTools.mock.calls[0][0] as {
+            systemPrompt: string;
+        };
+        expect(SYSTEM_PROMPT).toContain("ask_inputs");
+        expect(systemPrompt).not.toContain("ask_inputs");
+        expect(systemPrompt).toContain("ask for it in plain text");
+    });
+
+    it("keeps the ask_inputs instructions for callers that can answer the picker", async () => {
+        streamChatWithTools.mockResolvedValue({ fullText: "An answer." });
+
+        await run();
+
+        const { systemPrompt } = streamChatWithTools.mock.calls[0][0] as {
+            systemPrompt: string;
+        };
+        expect(systemPrompt).toBe(SYSTEM_PROMPT);
+    });
+
+    it("turns a call to the withheld ask_inputs tool into a plain-text question", async () => {
+        streamChatWithTools.mockRejectedValue(
+            new UnavailableToolCallError("ask_inputs", {
+                items: [
+                    {
+                        id: "party",
+                        kind: "choice",
+                        question: "Which party do you represent?",
+                        options: [{ value: "Buyer" }, { value: "Seller" }],
+                    },
+                ],
+            }),
+        );
+
+        const { write, result } = await run({ includeAskInputs: false });
+
+        const events = sseEvents(write) as { type: string; text?: string }[];
+        expect(events.map((e) => e.type)).not.toContain("error");
+        const text = events
+            .filter((e) => e.type === "content_delta")
+            .map((e) => e.text)
+            .join("");
+        expect(text).toContain("Which party do you represent? (options: Buyer, Seller)");
+        expect(result.fullText).toContain("Which party do you represent?");
+    });
+
+    it("still fails a call to any other unavailable tool", async () => {
+        streamChatWithTools.mockRejectedValue(
+            new UnavailableToolCallError("delete_everything", {}),
+        );
+
+        await expect(run({ includeAskInputs: false })).rejects.toThrow();
     });
 });
