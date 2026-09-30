@@ -18,6 +18,7 @@ import {
     runLLMStream,
     stripTransientAssistantEvents,
     parseChatMessages,
+    parseOptionalAllowAskInputs,
     parseOptionalAskInputsResponse,
     parseOptionalChatId,
     parseOptionalModel,
@@ -427,11 +428,20 @@ chatRouter.post("/", requireAuth, async (req, res) => {
             .status(400)
             .json({ detail: parsedAskInputsResponse.detail });
     }
+    const parsedAllowAskInputs = parseOptionalAllowAskInputs(
+        body.allow_ask_inputs,
+    );
+    if (!parsedAllowAskInputs.ok) {
+        return void res
+            .status(400)
+            .json({ detail: parsedAllowAskInputs.detail });
+    }
     const messages = parsedMessages.value;
     const chat_id = parsedChatId.value;
     const project_id = parsedProjectId.value.projectId;
     const model = parsedModel.value;
     const askInputsResponse = parsedAskInputsResponse.value;
+    const allowAskInputs = parsedAllowAskInputs.value;
     // Reserve a stable assistant identity before streaming. This lets clients
     // associate streamed UI with the same durable message after a reload.
     const assistantMessageId = askInputsResponse ? null : randomUUID();
@@ -657,6 +667,7 @@ chatRouter.post("/", requireAuth, async (req, res) => {
             write,
             workflowStore,
             includeResearchTools: legalResearchUs,
+            includeAskInputs: allowAskInputs,
             model,
             apiKeys,
             signal: stream.signal,
