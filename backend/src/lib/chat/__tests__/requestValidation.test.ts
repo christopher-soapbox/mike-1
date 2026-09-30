@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
     parseChatMessages,
+    parseOptionalAllowAskInputs,
     parseOptionalAskInputsResponse,
     parseOptionalAttachedDocuments,
     parseOptionalChatId,
@@ -105,6 +106,21 @@ describe("chat request validation", () => {
         ],
     ])("rejects an invalid message payload", (value, detail) => {
         expect(parseChatMessages(value)).toEqual({ ok: false, detail });
+    });
+
+    it("defaults allow_ask_inputs to true and accepts only booleans", () => {
+        expect(parseOptionalAllowAskInputs(undefined)).toEqual({
+            ok: true,
+            value: true,
+        });
+        expect(parseOptionalAllowAskInputs(false)).toEqual({
+            ok: true,
+            value: false,
+        });
+        expect(parseOptionalAllowAskInputs("false")).toEqual({
+            ok: false,
+            detail: "allow_ask_inputs must be a boolean",
+        });
     });
 
     it("normalizes optional identifiers without enumerating model names", () => {

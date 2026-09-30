@@ -19,6 +19,7 @@ import {
     stripTransientAssistantEvents,
     PROJECT_EXTRA_TOOLS,
     parseChatMessages,
+    parseOptionalAllowAskInputs,
     parseOptionalAskInputsResponse,
     parseOptionalAttachedDocuments,
     parseOptionalChatId,
@@ -84,6 +85,14 @@ projectChatRouter.post("/", requireAuth, async (req, res) => {
             .status(400)
             .json({ detail: parsedAskInputsResponse.detail });
     }
+    const parsedAllowAskInputs = parseOptionalAllowAskInputs(
+        body.allow_ask_inputs,
+    );
+    if (!parsedAllowAskInputs.ok) {
+        return void res
+            .status(400)
+            .json({ detail: parsedAllowAskInputs.detail });
+    }
 
     const messages = parsedMessages.value;
     const chat_id = parsedChatId.value;
@@ -91,6 +100,7 @@ projectChatRouter.post("/", requireAuth, async (req, res) => {
     const displayed_doc = parsedDisplayedDoc.value;
     const attached_documents = parsedAttachedDocuments.value;
     const askInputsResponse = parsedAskInputsResponse.value;
+    const allowAskInputs = parsedAllowAskInputs.value;
 
     const db = createServerSupabase();
 
@@ -304,6 +314,7 @@ projectChatRouter.post("/", requireAuth, async (req, res) => {
             extraTools: PROJECT_EXTRA_TOOLS,
             workflowStore,
             includeResearchTools: legalResearchUs,
+            includeAskInputs: allowAskInputs,
             model,
             apiKeys,
             signal: streamAbort.signal,

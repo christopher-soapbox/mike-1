@@ -136,6 +136,27 @@ class AssistantStreamAskInputsPause extends Error {
   }
 }
 
+// The AI SDK adapter reports a throwing tool as a tool-error part and rethrows
+// it as a new Error (lib/llm/aiSdk.ts), so the pause can arrive without its
+// class. Match it by name, by message, or down the cause chain, as upstream
+// does (open-legal-products/mike 1672f7361a).
+function isAskInputsPause(error: unknown): boolean {
+  if (error instanceof AssistantStreamAskInputsPause) return true;
+  if (!error || typeof error !== "object") return false;
+  const record = error as {
+    name?: unknown;
+    message?: unknown;
+    cause?: unknown;
+  };
+  if (
+    record.name === "AssistantStreamAskInputsPause" ||
+    record.message === "Waiting for user input."
+  ) {
+    return true;
+  }
+  return record.cause !== error && isAskInputsPause(record.cause);
+}
+
 export function isAbortError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   const record = error as { name?: unknown; message?: unknown };
@@ -557,7 +578,7 @@ export async function runLLMStream(params: {
       },
     });
   } catch (err) {
-    if (err instanceof AssistantStreamAskInputsPause) {
+    if (isAskInputsPause(err)) {
       // The ask_inputs event has already been emitted and persisted in `events`.
       // Stop this assistant turn here so the model does not add redundant
       // prose telling the user to answer the picker or attach documents.
