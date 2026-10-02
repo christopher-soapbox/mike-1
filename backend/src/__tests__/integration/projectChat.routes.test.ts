@@ -170,7 +170,7 @@ describe("POST /projects/:projectId/chat", () => {
                         },
                     },
                 ],
-                model: " custom-model ",
+                model: " claude-sonnet-5-5 ",
                 displayed_doc: {
                     filename: " displayed.pdf ",
                     document_id: " displayed-document ",
@@ -208,7 +208,7 @@ describe("POST /projects/:projectId/chat", () => {
         expect(messages[0].content).toContain("displayed-document");
         expect(systemPromptExtra).toContain("attached.pdf");
         expect(runLLMStream.mock.calls[0][0]).toMatchObject({
-            model: "custom-model",
+            model: "claude-sonnet-5-5",
         });
     });
 

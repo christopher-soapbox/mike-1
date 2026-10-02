@@ -32,7 +32,7 @@ const keys = (configured: {
 
 describe("getModelProvider", () => {
     it("maps each settings model to a provider via its group", () => {
-        expect(getModelProvider("claude-opus-5")).toBe("claude");
+        expect(getModelProvider("claude-opus-5-5")).toBe("claude");
         expect(getModelProvider("gemini-3.7-flash")).toBe("gemini");
         expect(getModelProvider("gpt-5.6-sol")).toBe("openai");
         expect(getModelProvider("openrouter/openai/gpt-5.4")).toBe(
@@ -62,10 +62,10 @@ describe("getModelProvider", () => {
 
 describe("isModelAvailable", () => {
     it("is true only when the model's provider has a configured key", () => {
-        expect(isModelAvailable("claude-fable-5", keys({ claude: true }))).toBe(
+        expect(isModelAvailable("claude-opus-5-5", keys({ claude: true }))).toBe(
             true,
         );
-        expect(isModelAvailable("claude-fable-5", keys({ gemini: true }))).toBe(
+        expect(isModelAvailable("claude-opus-5-5", keys({ gemini: true }))).toBe(
             false,
         );
         expect(

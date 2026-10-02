@@ -146,11 +146,22 @@ describe("runLLMStream router-model allowlist", () => {
 
     it("does not consult the router selection for first-party models", async () => {
         const db = routerModelsDb([]);
-        await runStreamWithModel(db, "claude-fable-5");
+        await runStreamWithModel(db, "claude-sonnet-5-5");
 
         expect(streamChatWithTools).toHaveBeenCalledWith(
-            expect.objectContaining({ model: "claude-fable-5" }),
+            expect.objectContaining({ model: "claude-sonnet-5-5" }),
         );
         expect(tablesQueried(db)).not.toContain("user_router_models");
+    });
+});
+
+describe("runLLMStream default model", () => {
+    it("runs a request with no model on Claude, not Gemini", async () => {
+        const db = routerModelsDb([]);
+        await runStreamWithModel(db, undefined as never);
+
+        expect(streamChatWithTools).toHaveBeenCalledWith(
+            expect.objectContaining({ model: "claude-opus-5-5" }),
+        );
     });
 });

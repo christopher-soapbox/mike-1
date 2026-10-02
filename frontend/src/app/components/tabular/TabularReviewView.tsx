@@ -135,7 +135,7 @@ export function TRView({ reviewId, projectId }: Props) {
     // Unknown key state fails open; the submit gates below already skip when
     // apiKeys is undefined.
     const apiKeys = apiKeysDegraded ? undefined : profile?.apiKeys;
-    const tabularModel = profile?.tabularModel ?? "gemini-3-flash-preview";
+    const tabularModel = profile?.tabularModel ?? "claude-sonnet-5-5";
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);

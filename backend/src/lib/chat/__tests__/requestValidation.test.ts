@@ -112,9 +112,13 @@ describe("chat request validation", () => {
             ok: true,
             value: "chat-1",
         });
-        expect(parseOptionalModel(" future-provider/new-model ")).toEqual({
+        expect(parseOptionalModel(" claude-opus-5-5 ")).toEqual({
             ok: true,
-            value: "future-provider/new-model",
+            value: "claude-opus-5-5",
+        });
+        expect(parseOptionalModel("openrouter/vendor/new-model")).toEqual({
+            ok: true,
+            value: "openrouter/vendor/new-model",
         });
         expect(parseOptionalProjectId(" project-1 ")).toEqual({
             ok: true,
@@ -136,6 +140,19 @@ describe("chat request validation", () => {
         ],
     ])("rejects an invalid optional identifier", (parse, value, detail) => {
         expect(parse(value)).toEqual({ ok: false, detail });
+    });
+
+    it("refuses a model id no provider can route", () => {
+        // It used to pass validation and then fall back to the default model,
+        // answering with a model the caller never asked for.
+        expect(parseOptionalModel("future-provider/new-model")).toEqual({
+            ok: false,
+            detail: "Unknown model id: future-provider/new-model",
+        });
+        expect(parseOptionalModel("claude-opus-9-9")).toEqual({
+            ok: false,
+            detail: "Unknown model id: claude-opus-9-9",
+        });
     });
 
     it("normalizes displayed and attached document references", () => {

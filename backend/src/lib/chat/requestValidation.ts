@@ -1,3 +1,4 @@
+import { isKnownModel } from "../llm/models";
 import { parseAskInputsResponsePayload } from "./contextBuilders";
 import {
   MAX_ASK_INPUT_TEXT_LENGTH,
@@ -61,7 +62,13 @@ export function parseOptionalModel(
   value: unknown,
 ): ValidationResult<string | undefined> {
   if (value === undefined) return { ok: true, value: undefined };
-  return parseNonEmptyString(value, "model must be a non-empty string");
+  const parsed = parseNonEmptyString(value, "model must be a non-empty string");
+  // An unknown id used to fall back to the default silently, so the caller
+  // got an answer from a model it never asked for. Refuse it instead.
+  if (parsed.ok && !isKnownModel(parsed.value)) {
+    return { ok: false, detail: `Unknown model id: ${parsed.value}` };
+  }
+  return parsed;
 }
 
 function parseMessageFiles(
