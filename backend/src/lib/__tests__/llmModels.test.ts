@@ -20,6 +20,7 @@ import {
     isOpenCodeGoChatCompletionsModel,
     isOpenCodeGoMessagesModel,
     isSupportedOpenCodeGoModel,
+    isKnownModel,
 } from "../llm/models";
 
 // ---------------------------------------------------------------------------
@@ -92,8 +93,8 @@ describe("providerForModel", () => {
 
 describe("resolveModel", () => {
     it("returns a known model id unchanged", () => {
-        expect(resolveModel("claude-opus-5", DEFAULT_MAIN_MODEL)).toBe(
-            "claude-opus-5",
+        expect(resolveModel("claude-opus-5-5", DEFAULT_MAIN_MODEL)).toBe(
+            "claude-opus-5-5",
         );
         expect(resolveModel("gemini-3.7-flash", DEFAULT_MAIN_MODEL)).toBe(
             "gemini-3.7-flash",
@@ -142,6 +143,19 @@ describe("resolveModel", () => {
         ).toBe("gemini-3.5-flash-lite");
         expect(resolveModel("gpt-5.4-lite", DEFAULT_MAIN_MODEL)).toBe(
             "gpt-5.4-mini",
+        );
+    });
+
+    it("maps retired Claude ids to the current Anthropic ids", () => {
+        expect(resolveModel("claude-opus-5", "x")).toBe("claude-opus-5-5");
+        // Same family: a user who chose Fable keeps Fable.
+        expect(resolveModel("claude-fable-5", "x")).toBe("claude-fable-5-1");
+        expect(resolveModel("claude-sonnet-5", "x")).toBe("claude-sonnet-5-5");
+        expect(resolveModel("claude-sonnet-4-6", "x")).toBe(
+            "claude-sonnet-5-5",
+        );
+        expect(resolveModel("claude-haiku-4-5", "x")).toBe(
+            "claude-haiku-4-5-20251001",
         );
     });
 
@@ -256,9 +270,30 @@ describe("default models", () => {
         );
     });
 
-    it("every default has a resolvable provider", () => {
-        expect(providerForModel(DEFAULT_MAIN_MODEL)).toBe("gemini");
-        expect(providerForModel(DEFAULT_TITLE_MODEL)).toBe("gemini");
-        expect(providerForModel(DEFAULT_TABULAR_MODEL)).toBe("gemini");
+    it("every default resolves to the claude provider", () => {
+        expect(providerForModel(DEFAULT_MAIN_MODEL)).toBe("claude");
+        expect(providerForModel(DEFAULT_TITLE_MODEL)).toBe("claude");
+        expect(providerForModel(DEFAULT_TABULAR_MODEL)).toBe("claude");
+    });
+
+    it("defaults are the Anthropic tiers: Opus main, Sonnet tabular, Haiku title", () => {
+        expect(DEFAULT_MAIN_MODEL).toBe("claude-opus-5-5");
+        expect(DEFAULT_TABULAR_MODEL).toBe("claude-sonnet-5-5");
+        expect(DEFAULT_TITLE_MODEL).toBe("claude-haiku-4-5-20251001");
+    });
+});
+
+describe("isKnownModel", () => {
+    it("accepts catalog, legacy and router-shaped ids", () => {
+        expect(isKnownModel("claude-opus-5-5")).toBe(true);
+        expect(isKnownModel("gemini-3.7-flash")).toBe(true);
+        expect(isKnownModel("claude-opus-5")).toBe(true);
+        expect(isKnownModel("openrouter/anthropic/claude-x")).toBe(true);
+    });
+
+    it("refuses ids no provider can route", () => {
+        expect(isKnownModel("claude-opus-9-9")).toBe(false);
+        expect(isKnownModel("gpt-3.5-turbo")).toBe(false);
+        expect(isKnownModel("not-a-model")).toBe(false);
     });
 });

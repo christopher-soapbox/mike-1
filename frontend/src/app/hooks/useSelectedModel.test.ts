@@ -20,16 +20,26 @@ describe("useSelectedModel", () => {
 
         const { result } = renderHook(() => useSelectedModel());
 
-        expect(result.current[0]).toBe("gemini-3-flash-preview");
+        expect(result.current[0]).toBe("claude-opus-5-5");
     });
 
     it("persists a valid explicit selection", () => {
         const { result } = renderHook(() => useSelectedModel());
 
-        act(() => result.current[1]("claude-fable-5"));
+        act(() => result.current[1]("claude-sonnet-5-5"));
 
-        expect(result.current[0]).toBe("claude-fable-5");
-        expect(window.localStorage.getItem(STORAGE_KEY)).toBe("claude-fable-5");
+        expect(result.current[0]).toBe("claude-sonnet-5-5");
+        expect(window.localStorage.getItem(STORAGE_KEY)).toBe(
+            "claude-sonnet-5-5",
+        );
+    });
+
+    it("maps a stored retired Claude id to its current id", () => {
+        window.localStorage.setItem(STORAGE_KEY, "claude-sonnet-5");
+
+        const { result } = renderHook(() => useSelectedModel());
+
+        expect(result.current[0]).toBe("claude-sonnet-5-5");
     });
 
     it("keeps a router selection that is in the loaded saved lists", () => {
@@ -57,9 +67,9 @@ describe("useSelectedModel", () => {
             }),
         );
 
-        expect(result.current[0]).toBe("gemini-3-flash-preview");
+        expect(result.current[0]).toBe("claude-opus-5-5");
         expect(window.localStorage.getItem(STORAGE_KEY)).toBe(
-            "gemini-3-flash-preview",
+            "claude-opus-5-5",
         );
     });
 
@@ -88,7 +98,7 @@ describe("useSelectedModel", () => {
             }),
         );
 
-        expect(result.current[0]).toBe("gemini-3-flash-preview");
+        expect(result.current[0]).toBe("claude-opus-5-5");
     });
 
     it("leaves a router selection alone while the lists are still loading", () => {
@@ -106,6 +116,8 @@ describe("canonicalModelId", () => {
             "gemini-3.5-flash-lite",
         );
         expect(canonicalModelId("gpt-5.4-lite")).toBe("gpt-5.4-mini");
-        expect(canonicalModelId("claude-fable-5")).toBe("claude-fable-5");
+        expect(canonicalModelId("claude-opus-5")).toBe("claude-opus-5-5");
+        expect(canonicalModelId("claude-fable-5")).toBe("claude-fable-5-1");
+        expect(canonicalModelId("claude-opus-5-5")).toBe("claude-opus-5-5");
     });
 });

@@ -18,6 +18,7 @@ import {
     runLLMStream,
     stripTransientAssistantEvents,
     parseChatMessages,
+    parseOptionalAllowAskInputs,
     parseOptionalAskInputsResponse,
     parseOptionalChatId,
     parseOptionalModel,
@@ -126,6 +127,11 @@ chatRouter.post("/create", requireAuth, async (req, res) => {
         return void res.status(400).json({ detail: parsedProjectId.detail });
     }
     const projectId = parsedProjectId.value.projectId;
+    const externalRef =
+        typeof req.body?.external_ref === "string" &&
+        req.body.external_ref.trim().length > 0
+            ? req.body.external_ref.trim().slice(0, 200)
+            : null;
     const db = createServerSupabase();
     const projectAccess = await validateAccessibleProjectId(
         projectId,
@@ -138,13 +144,49 @@ chatRouter.post("/create", requireAuth, async (req, res) => {
             .status(projectAccess.status)
             .json({ detail: projectAccess.detail });
 
+    if (externalRef) {
+        const { data: existing, error: lookupError } = await db
+            .from("chats")
+            .select("id")
+            .eq("user_id", userId)
+            .eq("external_ref", externalRef)
+            .maybeSingle();
+        if (lookupError)
+            return void res.status(500).json({ detail: lookupError.message });
+        if (existing) return void res.json({ id: existing.id });
+    }
+
     const { data, error } = await db
         .from("chats")
-        .insert({ user_id: userId, project_id: projectId ?? null })
+        .insert({
+            user_id: userId,
+            project_id: projectId ?? null,
+            external_ref: externalRef,
+        })
         .select("id")
         .single();
 
-    if (error) return void res.status(500).json({ detail: error.message });
+    if (error) {
+        // A concurrent request can win the race between our lookup and this
+        // insert: both pass the SELECT above (finding nothing), then both
+        // attempt to insert. The unique partial index on
+        // (user_id, external_ref) stops the duplicate row, but the loser
+        // sees a 23505 unique-violation here instead of a chat id. Since we
+        // know the row now exists (that's the only way this insert can
+        // violate that particular index), re-run the lookup and hand back
+        // the winner's id instead of surfacing a spurious 500.
+        if (error.code === "23505" && externalRef) {
+            const { data: existing, error: relookupError } = await db
+                .from("chats")
+                .select("id")
+                .eq("user_id", userId)
+                .eq("external_ref", externalRef)
+                .maybeSingle();
+            if (!relookupError && existing)
+                return void res.json({ id: existing.id });
+        }
+        return void res.status(500).json({ detail: error.message });
+    }
     res.json({ id: data.id });
 });
 
@@ -386,11 +428,20 @@ chatRouter.post("/", requireAuth, async (req, res) => {
             .status(400)
             .json({ detail: parsedAskInputsResponse.detail });
     }
+    const parsedAllowAskInputs = parseOptionalAllowAskInputs(
+        body.allow_ask_inputs,
+    );
+    if (!parsedAllowAskInputs.ok) {
+        return void res
+            .status(400)
+            .json({ detail: parsedAllowAskInputs.detail });
+    }
     const messages = parsedMessages.value;
     const chat_id = parsedChatId.value;
     const project_id = parsedProjectId.value.projectId;
     const model = parsedModel.value;
     const askInputsResponse = parsedAskInputsResponse.value;
+    const allowAskInputs = parsedAllowAskInputs.value;
     // Reserve a stable assistant identity before streaming. This lets clients
     // associate streamed UI with the same durable message after a reload.
     const assistantMessageId = askInputsResponse ? null : randomUUID();
@@ -616,6 +667,7 @@ chatRouter.post("/", requireAuth, async (req, res) => {
             write,
             workflowStore,
             includeResearchTools: legalResearchUs,
+            includeAskInputs: allowAskInputs,
             model,
             apiKeys,
             signal: stream.signal,

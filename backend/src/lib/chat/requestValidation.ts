@@ -1,3 +1,4 @@
+import { isKnownModel } from "../llm/models";
 import { parseAskInputsResponsePayload } from "./contextBuilders";
 import {
   MAX_ASK_INPUT_TEXT_LENGTH,
@@ -57,11 +58,33 @@ export function parseOptionalChatId(
   return parseNonEmptyString(value, "chat_id must be a non-empty string");
 }
 
+/**
+ * `allow_ask_inputs: false` is for API callers (the mike-integrations MCP
+ * and Slack bridge) that cannot render or answer the ask_inputs picker: the
+ * tool is then not offered, so the model answers instead of pausing.
+ * Absent means true, the browser's behaviour.
+ */
+export function parseOptionalAllowAskInputs(
+  value: unknown,
+): ValidationResult<boolean> {
+  if (value === undefined) return { ok: true, value: true };
+  if (typeof value !== "boolean") {
+    return { ok: false, detail: "allow_ask_inputs must be a boolean" };
+  }
+  return { ok: true, value };
+}
+
 export function parseOptionalModel(
   value: unknown,
 ): ValidationResult<string | undefined> {
   if (value === undefined) return { ok: true, value: undefined };
-  return parseNonEmptyString(value, "model must be a non-empty string");
+  const parsed = parseNonEmptyString(value, "model must be a non-empty string");
+  // An unknown id used to fall back to the default silently, so the caller
+  // got an answer from a model it never asked for. Refuse it instead.
+  if (parsed.ok && !isKnownModel(parsed.value)) {
+    return { ok: false, detail: `Unknown model id: ${parsed.value}` };
+  }
+  return parsed;
 }
 
 function parseMessageFiles(

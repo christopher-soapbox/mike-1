@@ -75,3 +75,20 @@ export type StreamChatParams = {
 export type StreamChatResult = {
     fullText: string;
 };
+
+/**
+ * The model called a tool that was not offered this turn (the AI SDK's
+ * NoSuchToolError). Carries the call so a caller can degrade it, e.g. turn a
+ * withheld ask_inputs call into a plain-text question.
+ */
+export class UnavailableToolCallError extends Error {
+    readonly toolName: string;
+    readonly input: unknown;
+
+    constructor(toolName: string, input: unknown, message?: string) {
+        super(message ?? `Model tried to call unavailable tool '${toolName}'.`);
+        this.name = "UnavailableToolCallError";
+        this.toolName = toolName;
+        this.input = input;
+    }
+}

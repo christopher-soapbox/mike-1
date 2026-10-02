@@ -10,6 +10,7 @@ import type {
   StreamChatParams,
   StreamChatResult,
 } from "./types";
+import { UnavailableToolCallError } from "./types";
 import { createRawLlmStreamRecorder, logRawLlmStream } from "./rawStreamLog";
 
 const MAX_OUTPUT_TOKENS = 16_384;
@@ -346,6 +347,15 @@ export async function streamAiSdk(
           break;
         }
         case "tool-error":
+          // A call to a tool that was not offered this turn keeps its name
+          // and input, so the caller can degrade it instead of failing.
+          if (sdk.NoSuchToolError.isInstance(part.error)) {
+            throw new UnavailableToolCallError(
+              part.toolName,
+              part.input,
+              errorMessage(part.error, config.label),
+            );
+          }
           throw new Error(errorMessage(part.error, config.label));
         case "error":
           throw new Error(errorMessage(part.error, config.label));

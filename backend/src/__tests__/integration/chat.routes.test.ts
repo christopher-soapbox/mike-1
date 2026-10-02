@@ -812,6 +812,41 @@ describe("POST /chat — streaming endpoint", () => {
         expect(runLLMStream).not.toHaveBeenCalled();
     });
 
+    it("lets an API caller that cannot answer a picker opt out of ask_inputs", async () => {
+        const res = await request(app)
+            .post("/chat")
+            .set("Authorization", "Bearer test")
+            .send({ ...VALID_BODY, allow_ask_inputs: false });
+
+        expect(res.status).toBe(200);
+        expect(runLLMStream).toHaveBeenCalledWith(
+            expect.objectContaining({ includeAskInputs: false }),
+        );
+    });
+
+    it("keeps ask_inputs for callers that do not send the flag", async () => {
+        const res = await request(app)
+            .post("/chat")
+            .set("Authorization", "Bearer test")
+            .send(VALID_BODY);
+
+        expect(res.status).toBe(200);
+        expect(runLLMStream).toHaveBeenCalledWith(
+            expect.objectContaining({ includeAskInputs: true }),
+        );
+    });
+
+    it("returns 400 when allow_ask_inputs is not a boolean", async () => {
+        const res = await request(app)
+            .post("/chat")
+            .set("Authorization", "Bearer test")
+            .send({ ...VALID_BODY, allow_ask_inputs: "false" });
+
+        expect(res.status).toBe(400);
+        expect(res.body.detail).toBe("allow_ask_inputs must be a boolean");
+        expect(runLLMStream).not.toHaveBeenCalled();
+    });
+
     it("returns 400 when chat_id is not a non-empty string", async () => {
         const res = await request(app)
             .post("/chat")

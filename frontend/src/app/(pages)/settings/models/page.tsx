@@ -104,7 +104,7 @@ export default function ModelPreferencesPage() {
                             value={canonicalModelId(
                                 optimisticValues.titleModel ??
                                     profile?.titleModel ??
-                                    "gemini-3.5-flash-lite",
+                                    "claude-haiku-4-5-20251001",
                             )}
                             options={[
                                 ...SETTINGS_MODELS,
@@ -133,7 +133,7 @@ export default function ModelPreferencesPage() {
                             value={canonicalModelId(
                                 optimisticValues.tabularModel ??
                                     profile?.tabularModel ??
-                                    "gemini-3-flash-preview",
+                                    "claude-sonnet-5-5",
                             )}
                             options={[
                                 ...MODELS,

@@ -77,12 +77,26 @@ describe("getUserModelSettings router-model allowlist", () => {
 
         // Gemini env key present → cheap default title model; tabular default.
         expect(settings.title_model).toBe("gemini-3.5-flash-lite");
-        expect(settings.tabular_model).toBe("gemini-3-flash-preview");
+        expect(settings.tabular_model).toBe("claude-sonnet-5-5");
         expect(warn).toHaveBeenCalled();
         warn.mockRestore();
     });
 
     it("keeps first-party preferences untouched", async () => {
+        const settings = await getUserModelSettings(
+            "user-1",
+            profileDb({
+                title_model: "claude-haiku-4-5-20251001",
+                tabular_model: "claude-sonnet-5-5",
+                legal_research_us: true,
+            }),
+        );
+
+        expect(settings.title_model).toBe("claude-haiku-4-5-20251001");
+        expect(settings.tabular_model).toBe("claude-sonnet-5-5");
+    });
+
+    it("maps a stored retired Claude id to its current id", async () => {
         const settings = await getUserModelSettings(
             "user-1",
             profileDb({
@@ -92,7 +106,25 @@ describe("getUserModelSettings router-model allowlist", () => {
             }),
         );
 
-        expect(settings.title_model).toBe("claude-haiku-4-5");
-        expect(settings.tabular_model).toBe("claude-sonnet-5");
+        expect(settings.title_model).toBe("claude-haiku-4-5-20251001");
+        expect(settings.tabular_model).toBe("claude-sonnet-5-5");
+    });
+});
+
+describe("getUserModelSettings defaults", () => {
+    it("titles with Claude Haiku when the Anthropic key is present, even beside Gemini", async () => {
+        getUserApiKeys.mockResolvedValue({
+            ...NO_KEYS,
+            claude: "env-anthropic-key",
+        });
+        getAllUserRouterModels.mockResolvedValue({
+            openrouter: [],
+            vercel: [],
+            "opencode-go": [],
+        });
+        const settings = await getUserModelSettings("user-1", profileDb(null));
+
+        expect(settings.title_model).toBe("claude-haiku-4-5-20251001");
+        expect(settings.tabular_model).toBe("claude-sonnet-5-5");
     });
 });

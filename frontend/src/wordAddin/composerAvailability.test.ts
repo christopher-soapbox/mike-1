@@ -22,7 +22,7 @@ describe("isModelAvailable fail-open", () => {
         // A flaky WKWebView preflight must not brick the composer: the
         // backend still rejects models it cannot serve.
         expect(isModelAvailable("gemini-3-flash-preview", null)).toBe(true);
-        expect(isModelAvailable("claude-fable-5", null)).toBe(true);
+        expect(isModelAvailable("claude-opus-5-5", null)).toBe(true);
         expect(isModelAvailable("openrouter/openai/gpt-5.4", null)).toBe(true);
         expect(isModelAvailable("vercel/openai/gpt-5.4", null)).toBe(true);
         expect(isModelAvailable("opencode-go/glm-5", null)).toBe(true);

@@ -88,7 +88,7 @@ function cleanAskInputString(value: unknown, fallback = ""): string {
   return text || fallback;
 }
 
-function normalizeAskInputsEvent(
+export function normalizeAskInputsEvent(
   args: Record<string, unknown>,
 ): AskInputsEvent {
   const rawItems = Array.isArray(args.items) ? args.items : [];

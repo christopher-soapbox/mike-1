@@ -106,7 +106,7 @@ describe("ModelToggle availability states", () => {
     it("filters to configured providers when keys are loaded", () => {
         render(
             <ModelToggle
-                value="claude-fable-5"
+                value="claude-opus-5-5"
                 onChange={vi.fn()}
                 apiKeys={keys({ gemini: true })}
             />,
