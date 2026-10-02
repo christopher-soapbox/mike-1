@@ -4,13 +4,11 @@ import type { Provider } from "./types";
 // Canonical model IDs
 // ---------------------------------------------------------------------------
 // Main-chat tier (top-end) — user picks one of these per message.
+// Claude ids are the Anthropic API's current ones; retired ids live in
+// LEGACY_MODEL_IDS so saved selections keep working.
 export const CLAUDE_MAIN_MODELS = [
-    "claude-fable-5",
-    "claude-opus-5",
-    "claude-sonnet-5",
-    "claude-opus-4-8",
-    "claude-opus-4-7",
-    "claude-sonnet-4-6",
+    "claude-opus-5-5",
+    "claude-sonnet-5-5",
 ] as const;
 export const GEMINI_MAIN_MODELS = [
     "gemini-3.7-flash",
@@ -30,10 +28,7 @@ export const OPENAI_MAIN_MODELS = [
 // the form "ollama/<tag>" is valid — see providerForModel / resolveModel.
 
 // Mid-tier (used for tabular review) — user picks one in account settings.
-export const CLAUDE_MID_MODELS = [
-    "claude-sonnet-5",
-    "claude-sonnet-4-6",
-] as const;
+export const CLAUDE_MID_MODELS = ["claude-sonnet-5-5"] as const;
 export const GEMINI_MID_MODELS = [
     "gemini-3.7-flash",
     "gemini-3.6-flash",
@@ -44,16 +39,18 @@ export const OPENAI_MID_MODELS = ["gpt-5.6-terra", "gpt-5.4"] as const;
 
 // Low-tier (used for title generation, lightweight extractions) — user picks
 // one in account settings.
-export const CLAUDE_LOW_MODELS = ["claude-haiku-4-5"] as const;
+export const CLAUDE_LOW_MODELS = ["claude-haiku-4-5-20251001"] as const;
 export const GEMINI_LOW_MODELS = [
     "gemini-3.5-flash-lite",
     "gemini-3.1-flash-lite",
 ] as const;
 export const OPENAI_LOW_MODELS = ["gpt-5.6-luna", "gpt-5.4-mini"] as const;
 
-export const DEFAULT_MAIN_MODEL = "gemini-3-flash-preview";
-export const DEFAULT_TITLE_MODEL = "gemini-3.5-flash-lite";
-export const DEFAULT_TABULAR_MODEL = "gemini-3-flash-preview";
+// Defaults run on the operator's Anthropic key. Gemini stays selectable but is
+// never the default: its free-tier quota blocked work twice.
+export const DEFAULT_MAIN_MODEL = "claude-opus-5-5";
+export const DEFAULT_TITLE_MODEL = "claude-haiku-4-5-20251001";
+export const DEFAULT_TABULAR_MODEL = "claude-sonnet-5-5";
 
 // OpenCode Go publishes one catalog across three incompatible wire protocols:
 // OpenAI Responses, Anthropic Messages, and OpenAI Chat Completions. The live
@@ -119,7 +116,21 @@ export function providerForModel(model: string): Provider {
 export const LEGACY_MODEL_IDS: Record<string, string> = {
     "gemini-3.1-flash-lite-preview": "gemini-3.5-flash-lite",
     "gpt-5.4-lite": "gpt-5.4-mini",
+    "claude-fable-5": "claude-opus-5-5",
+    "claude-opus-5": "claude-opus-5-5",
+    "claude-opus-4-8": "claude-opus-5-5",
+    "claude-opus-4-7": "claude-opus-5-5",
+    "claude-sonnet-5": "claude-sonnet-5-5",
+    "claude-sonnet-4-6": "claude-sonnet-5-5",
+    "claude-haiku-4-5": "claude-haiku-4-5-20251001",
 };
+
+const UNKNOWN_MODEL = "";
+
+/** True when `id` (after legacy mapping) names a model Mike can route. */
+export function isKnownModel(id: string): boolean {
+    return resolveModel(id, UNKNOWN_MODEL) !== UNKNOWN_MODEL;
+}
 
 export function resolveModel(
     id: string | null | undefined,

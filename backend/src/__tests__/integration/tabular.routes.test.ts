@@ -154,7 +154,7 @@ describe("tabular.routes", () => {
             async (ids: string[]) => ids,
         );
         getUserModelSettings.mockResolvedValue({
-            title_model: "claude-haiku-4-5",
+            title_model: "claude-haiku-4-5-20251001",
             tabular_model: "claude-sonnet-4-5",
             legal_research_us: false,
             api_keys: { claude: "sk-test" },
@@ -827,7 +827,7 @@ describe("tabular.routes", () => {
                 error: null,
             };
             getUserModelSettings.mockResolvedValue({
-                title_model: "claude-haiku-4-5",
+                title_model: "claude-haiku-4-5-20251001",
                 tabular_model: "claude-sonnet-4-5",
                 legal_research_us: false,
                 api_keys: {},
@@ -903,7 +903,7 @@ describe("tabular.routes", () => {
             };
             supabaseState.tables.tabular_cells = { data: [], error: null };
             getUserModelSettings.mockResolvedValue({
-                title_model: "claude-haiku-4-5",
+                title_model: "claude-haiku-4-5-20251001",
                 tabular_model: "claude-sonnet-4-5",
                 legal_research_us: false,
                 api_keys: {},
@@ -958,7 +958,7 @@ describe("tabular.routes", () => {
             };
             supabaseState.tables.tabular_cells = { data: [], error: null };
             getUserModelSettings.mockResolvedValue({
-                title_model: "claude-haiku-4-5",
+                title_model: "claude-haiku-4-5-20251001",
                 tabular_model: "claude-sonnet-4-5",
                 legal_research_us: false,
                 api_keys: {},

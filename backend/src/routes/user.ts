@@ -6,7 +6,7 @@ import { recordAudit } from "../lib/audit";
 import {
     DEFAULT_TABULAR_MODEL,
     DEFAULT_TITLE_MODEL,
-    CLAUDE_LOW_MODELS,
+    GEMINI_LOW_MODELS,
     isSupportedOpenCodeGoModel,
     OPENAI_LOW_MODELS,
     resolveModel,
@@ -385,12 +385,13 @@ function serializeProfile(
     apiKeyStatus?: ApiKeyStatus,
 ) {
     const creditsUsed = row.message_credits_used ?? 0;
-    const titleFallback = apiKeyStatus?.gemini
+    // Same precedence as resolveTitleModel in lib/userSettings: Claude first.
+    const titleFallback = apiKeyStatus?.claude
         ? DEFAULT_TITLE_MODEL
-        : apiKeyStatus?.openai
-          ? OPENAI_LOW_MODELS[0]
-          : apiKeyStatus?.claude
-            ? CLAUDE_LOW_MODELS[0]
+        : apiKeyStatus?.gemini
+          ? GEMINI_LOW_MODELS[0]
+          : apiKeyStatus?.openai
+            ? OPENAI_LOW_MODELS[0]
             : (routerTitleFallback(routerModels, apiKeyStatus) ??
               DEFAULT_TITLE_MODEL);
     return {
