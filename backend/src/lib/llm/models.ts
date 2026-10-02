@@ -7,6 +7,7 @@ import type { Provider } from "./types";
 // Claude ids are the Anthropic API's current ones; retired ids live in
 // LEGACY_MODEL_IDS so saved selections keep working.
 export const CLAUDE_MAIN_MODELS = [
+    "claude-fable-5-1",
     "claude-opus-5-5",
     "claude-sonnet-5-5",
 ] as const;
@@ -116,7 +117,7 @@ export function providerForModel(model: string): Provider {
 export const LEGACY_MODEL_IDS: Record<string, string> = {
     "gemini-3.1-flash-lite-preview": "gemini-3.5-flash-lite",
     "gpt-5.4-lite": "gpt-5.4-mini",
-    "claude-fable-5": "claude-opus-5-5",
+    "claude-fable-5": "claude-fable-5-1",
     "claude-opus-5": "claude-opus-5-5",
     "claude-opus-4-8": "claude-opus-5-5",
     "claude-opus-4-7": "claude-opus-5-5",

@@ -148,7 +148,8 @@ describe("resolveModel", () => {
 
     it("maps retired Claude ids to the current Anthropic ids", () => {
         expect(resolveModel("claude-opus-5", "x")).toBe("claude-opus-5-5");
-        expect(resolveModel("claude-fable-5", "x")).toBe("claude-opus-5-5");
+        // Same family: a user who chose Fable keeps Fable.
+        expect(resolveModel("claude-fable-5", "x")).toBe("claude-fable-5-1");
         expect(resolveModel("claude-sonnet-5", "x")).toBe("claude-sonnet-5-5");
         expect(resolveModel("claude-sonnet-4-6", "x")).toBe(
             "claude-sonnet-5-5",

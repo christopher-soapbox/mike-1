@@ -11,6 +11,7 @@ import { useOllamaModels } from "@/app/hooks/useOllamaModels";
 export type ModelOption = ModelToggleOption;
 
 export const MODELS: ModelOption[] = [
+  { id: "claude-fable-5-1", label: "Claude Fable 5.1", group: "Anthropic" },
   { id: "claude-opus-5-5", label: "Claude Opus 5.5", group: "Anthropic" },
   { id: "claude-sonnet-5-5", label: "Claude Sonnet 5.5", group: "Anthropic" },
   { id: "gemini-3.7-flash", label: "Gemini 3.7 Flash", group: "Google" },
@@ -57,7 +58,7 @@ export const ALLOWED_MODEL_IDS = new Set(MODELS.map((m) => m.id));
 export const LEGACY_MODEL_IDS: Record<string, string> = {
   "gemini-3.1-flash-lite-preview": "gemini-3.5-flash-lite",
   "gpt-5.4-lite": "gpt-5.4-mini",
-  "claude-fable-5": "claude-opus-5-5",
+  "claude-fable-5": "claude-fable-5-1",
   "claude-opus-5": "claude-opus-5-5",
   "claude-opus-4-8": "claude-opus-5-5",
   "claude-opus-4-7": "claude-opus-5-5",

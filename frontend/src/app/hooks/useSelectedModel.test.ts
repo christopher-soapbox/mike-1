@@ -117,6 +117,7 @@ describe("canonicalModelId", () => {
         );
         expect(canonicalModelId("gpt-5.4-lite")).toBe("gpt-5.4-mini");
         expect(canonicalModelId("claude-opus-5")).toBe("claude-opus-5-5");
+        expect(canonicalModelId("claude-fable-5")).toBe("claude-fable-5-1");
         expect(canonicalModelId("claude-opus-5-5")).toBe("claude-opus-5-5");
     });
 });
