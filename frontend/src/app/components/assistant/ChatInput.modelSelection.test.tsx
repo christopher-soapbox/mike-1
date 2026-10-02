@@ -116,7 +116,7 @@ describe("ChatInput model selection vs. a degraded profile", () => {
 
         await waitFor(() =>
             expect(window.localStorage.getItem(STORAGE_KEY)).toBe(
-                "gemini-3-flash-preview",
+                "claude-opus-5-5",
             ),
         );
     });

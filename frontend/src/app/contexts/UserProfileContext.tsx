@@ -163,8 +163,8 @@ export function UserProfileProvider({ children }: { children: ReactNode }) {
                 creditsResetDate: futureResetDate.toISOString(),
                 creditsRemaining: 999999, // temporarily unlimited
                 tier: "Free",
-                titleModel: "gemini-3.5-flash-lite",
-                tabularModel: "gemini-3-flash-preview",
+                titleModel: "claude-haiku-4-5-20251001",
+                tabularModel: "claude-sonnet-5-5",
                 mfaOnLogin: false,
                 legalResearchUs: true,
                 quickActionsVisible: true,

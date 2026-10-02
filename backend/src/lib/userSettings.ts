@@ -3,6 +3,7 @@ import {
     resolveModel,
     DEFAULT_TITLE_MODEL,
     DEFAULT_TABULAR_MODEL,
+    GEMINI_LOW_MODELS,
     OPENAI_LOW_MODELS,
     type UserApiKeys,
 } from "./llm";
@@ -23,17 +24,16 @@ export type UserModelSettings = {
 };
 
 // Title generation is a lightweight task — always routed to the cheapest model
-// of whichever provider the user has keys for: Gemini Flash Lite if Gemini is
-// available, otherwise OpenAI lite, Claude Haiku, or the user's first saved
-// router model. With no usable provider, defaults to Gemini (the dev-mode env
-// fallback).
+// of whichever provider the user has keys for: Claude Haiku if Claude is
+// available, otherwise Gemini Flash Lite, OpenAI lite, or the user's first
+// saved router model. With no usable provider, defaults to Claude Haiku.
 function resolveTitleModel(
     apiKeys: UserApiKeys,
     routerModels: RouterModelSelections,
 ): string {
-    if (apiKeys.gemini?.trim()) return DEFAULT_TITLE_MODEL;
+    if (apiKeys.claude?.trim()) return DEFAULT_TITLE_MODEL;
+    if (apiKeys.gemini?.trim()) return GEMINI_LOW_MODELS[0];
     if (apiKeys.openai?.trim()) return OPENAI_LOW_MODELS[0];
-    if (apiKeys.claude?.trim()) return "claude-haiku-4-5";
     for (const slug of ROUTER_SLUGS) {
         const first = routerModels[slug][0];
         if (apiKeys[slug]?.trim() && first) return `${slug}/${first}`;
