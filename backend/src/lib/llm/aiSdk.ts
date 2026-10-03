@@ -15,6 +15,48 @@ import { createRawLlmStreamRecorder, logRawLlmStream } from "./rawStreamLog";
 
 const MAX_OUTPUT_TOKENS = 16_384;
 
+// Finish reasons that mean the model was stopped, not that it chose to stop.
+const ABNORMAL_FINISH_REASONS = new Set([
+  "length",
+  "content-filter",
+  "error",
+  "other",
+]);
+
+type StepSummary = {
+  finishReason: string;
+  rawFinishReason: string | null;
+  outputTokens: number | null;
+  reasoningTokens: number | null;
+};
+
+type UsageLike = {
+  inputTokens?: number;
+  outputTokens?: number;
+  outputTokenDetails?: { reasoningTokens?: number };
+};
+
+/**
+ * A turn that ended with no reply text because the model was cut off (token
+ * limit, filter, provider error, or the step cap reached mid tool use). It is
+ * an error, not an empty answer: callers saw "ok" with empty text otherwise.
+ */
+export class EmptyReplyError extends Error {
+  constructor(
+    readonly modelId: string,
+    readonly finishReason: string,
+    readonly rawFinishReason: string | null,
+    readonly steps: number,
+  ) {
+    super(
+      `${modelId} ended its turn with no reply text (finish reason: ${finishReason}${
+        rawFinishReason ? ` / ${rawFinishReason}` : ""
+      }, after ${steps} step${steps === 1 ? "" : "s"}).`,
+    );
+    this.name = "EmptyReplyError";
+  }
+}
+
 /** Ensure a proxy-closed final SSE event is still visible to SDK parsers. */
 export async function aiSdkFetch(
   input: RequestInfo | URL,
@@ -269,6 +311,11 @@ export async function streamAiSdk(
   let fullText = "";
   let iteration = 0;
   const openReasoningBlocks = new Set<string>();
+  const steps: StepSummary[] = [];
+  let finishReason = "unknown";
+  let rawFinishReason: string | null = null;
+  let totalUsage: UsageLike | undefined;
+  const maxSteps = params.maxIterations ?? 10;
 
   try {
     const result = sdk.streamText({
@@ -277,7 +324,7 @@ export async function streamAiSdk(
       messages: params.messages,
       tools,
       maxOutputTokens: MAX_OUTPUT_TOKENS,
-      stopWhen: sdk.stepCountIs(params.maxIterations ?? 10),
+      stopWhen: sdk.stepCountIs(maxSteps),
       abortSignal: params.abortSignal,
       reasoning:
         config.supportsReasoning === false
@@ -306,6 +353,21 @@ export async function streamAiSdk(
       switch (part.type) {
         case "start-step":
           iteration += 1;
+          break;
+        case "finish-step": {
+          const usage = part.usage as UsageLike | undefined;
+          steps.push({
+            finishReason: part.finishReason,
+            rawFinishReason: part.rawFinishReason ?? null,
+            outputTokens: usage?.outputTokens ?? null,
+            reasoningTokens: usage?.outputTokenDetails?.reasoningTokens ?? null,
+          });
+          break;
+        }
+        case "finish":
+          finishReason = part.finishReason;
+          rawFinishReason = part.rawFinishReason ?? null;
+          totalUsage = part.totalUsage as UsageLike | undefined;
           break;
         case "raw":
           logRawLlmStream({
@@ -371,6 +433,40 @@ export async function streamAiSdk(
       openReasoningBlocks.delete(id);
       params.callbacks?.onReasoningBlockEnd?.();
     }
+
+    // One production log line per turn: which model ran and how it ended.
+    // Metadata only, never prompt or reply text.
+    console.log(
+      `[llm/turn] ${JSON.stringify({
+        provider: config.provider,
+        model: config.modelId,
+        steps: steps.length,
+        finishReason,
+        rawFinishReason,
+        stepFinishReasons: steps.map((step) => step.finishReason),
+        inputTokens: totalUsage?.inputTokens ?? null,
+        outputTokens: totalUsage?.outputTokens ?? null,
+        reasoningTokens:
+          totalUsage?.outputTokenDetails?.reasoningTokens ?? null,
+        maxOutputTokens: MAX_OUTPUT_TOKENS,
+        replyChars: fullText.length,
+      })}`,
+    );
+
+    const stoppedAtStepCap =
+      steps.length >= maxSteps && finishReason === "tool-calls";
+    if (
+      !fullText.trim() &&
+      (ABNORMAL_FINISH_REASONS.has(finishReason) || stoppedAtStepCap)
+    ) {
+      throw new EmptyReplyError(
+        config.modelId,
+        stoppedAtStepCap ? `step cap of ${maxSteps} reached` : finishReason,
+        rawFinishReason,
+        steps.length,
+      );
+    }
+
     await rawStreamRecorder?.flush("completed");
     return { fullText };
   } catch (error) {
